@@ -1,16 +1,24 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const env = process.env.DATABASE_URL;
-    const hasEnv = !!env;
+    const hasEnv = !!process.env.DATABASE_URL;
 
-    // ตรวจสอบว่าไฟล์ .env มี DATABASE_URL หรือไม่
-    // ใน production จะตรวจสอบจากตารางฐานข้อมูลจริง
-    const installed = hasEnv;
+    // ถ้ายังไม่มี DATABASEurl ถือว่ายังไม่ติดตั้ง
+    if (!hasEnv) {
+      return NextResponse.json({ installed: false, reason: "no_env" });
+    }
 
-    return NextResponse.json({ installed });
+    // พยายามตรวจสอบว่าตารางฐานข้อมูลมีอยู่หรือไม่
+    try {
+      await prisma.company.findFirst();
+      return NextResponse.json({ installed: true });
+    } catch {
+      // ตารางยังไม่สร้าง (ยังไม่ได้รันマイกราชัน)
+      return NextResponse.json({ installed: false, reason: "no_db" });
+    }
   } catch {
-    return NextResponse.json({ installed: false });
+    return NextResponse.json({ installed: false, reason: "error" });
   }
 }
