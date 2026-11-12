@@ -60,22 +60,20 @@ export default function GlobalError({
 
             <button
               onClick={reset}
-              className="btn-primary w-full"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors w-full"
             >
               รีเฟรชหน้าเว็บ
             </button>
             <div className="mt-4">
-              <Link href="/installer" className="text-sm text-red-600 hover:underline">
+              <Link
+                href="/installer"
+                className="text-sm text-red-600 hover:underline"
+              >
                 → ติดตั้งระบบครั้งแรก
               </Link>
             </div>
           </div>
         </div>
-        <style>{`
-          .btn-primary {
-            @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors;
-          }
-        `}</style>
       </body>
     </html>
   );
