@@ -2,12 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, Database, Upload, History, Clock } from "lucide-react";
+import { ShieldCheck, Database, Upload, History, Clock, RefreshCw } from "lucide-react";
+
+type SystemStatus = {
+  installed: boolean;
+  reason: string;
+  message: string;
+  appVersion: string;
+};
 
 export default function SettingsPage() {
-  const [systemVersion, setSystemVersion] = useState("1.0.0");
-  const [latestVersion, setLatestVersion] = useState("1.0.0");
+  const [systemVersion, setSystemVersion] = useState("");
+  const [latestVersion, setLatestVersion] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [checkingVersion, setCheckingVersion] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [backuping, setBackuping] = useState(false);
   const [upgradeHistory, setUpgradeHistory] = useState<{
@@ -17,14 +25,70 @@ export default function SettingsPage() {
   }[]>([]);
 
   useEffect(() => {
-    // ตรวจสอบเวอร์ชันล่าสุด (จำลอง)
-    setLatestVersion("1.1.0");
-    setUpdateAvailable("1.1.0" !== systemVersion);
+    const LATEST_VERSION = process.env.NEXT_PUBLIC_LATEST_VERSION || "1.1.0";
+    setLatestVersion(LATEST_VERSION);
 
-    setUpgradeHistory([
-      { version: "1.0.0", date: "10 พ.ย. 2566", admin: "ระบบติดตั้งครั้งแรก" },
-    ]);
+    const loadStatus = async () => {
+      setCheckingVersion(true);
+      try {
+        const res = await fetch("/api/installer/status", { cache: "no-store" });
+        if (res.ok) {
+          const data: SystemStatus = await res.json();
+          if (data.installed && data.appVersion) {
+            setSystemVersion(data.appVersion);
+            setUpdateAvailable(data.appVersion !== LATEST_VERSION);
+          } else {
+            setSystemVersion("ไม่ทราบ");
+            setUpdateAvailable(false);
+          }
+        }
+      } catch {
+        setSystemVersion("ไม่ทราบ");
+      } finally {
+        setCheckingVersion(false);
+      }
+
+      // โหลดประวัติการอัปเกรด (จากฐานข้อมูลผ่าน API settings/upgrade history)
+      try {
+        const histRes = await fetch("/api/settings/upgrade-history", {
+          cache: "no-store",
+        });
+        if (histRes.ok) {
+          const history = await histRes.json();
+          setUpgradeHistory(history || []);
+        }
+      } catch {
+        // ใช้ค่าเริ่มต้น
+        setUpgradeHistory([
+          {
+            version: systemVersion || "1.0.0",
+            date: new Date().toLocaleDateString("th-TH"),
+            admin: "ระบบติดตั้งครั้งแรก",
+          },
+        ]);
+      }
+    };
+
+    loadStatus();
   }, []);
+
+  const handleCheckVersion = async () => {
+    setCheckingVersion(true);
+    try {
+      const res = await fetch("/api/installer/status", { cache: "no-store" });
+      if (res.ok) {
+        const data: SystemStatus = await res.json();
+        if (data.installed && data.appVersion) {
+          setSystemVersion(data.appVersion);
+          setUpdateAvailable(data.appVersion !== latestVersion);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCheckingVersion(false);
+    }
+  };
 
   const handleBackup = async () => {
     setBackuping(true);
@@ -33,7 +97,8 @@ export default function SettingsPage() {
       if (res.ok) {
         alert("สำรองข้อมูลสำเร็จแล้ว");
       } else {
-        alert("สำรองข้อมูลไม่สำเร็จ");
+        const data = await res.json();
+        alert(data.message || "สำรองข้อมูลไม่สำเร็จ");
       }
     } catch {
       alert("เกิดข้อผิดพลาดในการสำรองข้อมูล");
@@ -43,9 +108,14 @@ export default function SettingsPage() {
   };
 
   const handleUpgrade = async () => {
-    if (!confirm("คุณต้องการอัปเกรดระบบหรือไม่? ระบบจะหยุดทำงานชั่วคราว")) {
+    if (
+      !confirm(
+        "คุณต้องการอัปเกรดระบบหรือไม่? ระบบจะสำรองข้อมูลฐานข้อมูลและรันマイกราชันอัตโนมัติ"
+      )
+    ) {
       return;
     }
+
     setUpgrading(true);
     try {
       const res = await fetch("/api/settings/upgrade", {
@@ -59,7 +129,11 @@ export default function SettingsPage() {
         setSystemVersion(latestVersion);
         setUpdateAvailable(false);
         setUpgradeHistory((prev) => [
-          { version: latestVersion, date: new Date().toLocaleDateString("th-TH"), admin: "Super Admin" },
+          {
+            version: latestVersion,
+            date: new Date().toLocaleDateString("th-TH"),
+            admin: "Super Admin",
+          },
           ...prev,
         ]);
       } else {
@@ -72,6 +146,17 @@ export default function SettingsPage() {
       setUpgrading(false);
     }
   };
+
+  if (!systemVersion) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-lg p-8 text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-red-200 border-t-red-600"></div>
+          <p className="mt-4 text-gray-600">กำลังโหลดการตั้งค่าระบบ...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -145,19 +230,35 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                <div className="flex gap-3 mb-6">
+                  <button
+                    onClick={handleCheckVersion}
+                    disabled={checkingVersion}
+                    className="btn-secondary flex-1"
+                  >
+                    {checkingVersion ? (
+                      <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    ตรวจสอบอัปเดต
+                  </button>
+                </div>
+
                 {updateAvailable ? (
                   <div className="space-y-4">
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
                       <p className="text-sm text-amber-800">
                         ก่อนอัปเกรดระบบ ขอแนะนำให้สำรองข้อมูลฐานข้อมูล
-                        MariaDB เพื่อป้องกันข้อมูลสูญหาย
+                        MariaDB เพื่อป้องกันข้อมูลสูญหาย ระบบจะรันマイกราชัน
+                        อัตโนมัติหลังจากสำรองข้อมูลแล้ว
                       </p>
                     </div>
 
                     <div className="flex gap-3">
                       <button
                         onClick={handleBackup}
-                        disabled={backuping}
+                        disabled={backuping || upgrading}
                         className="btn-secondary flex-1"
                       >
                         {backuping ? (
@@ -236,11 +337,15 @@ export default function SettingsPage() {
             {/* การตั้งค่าทั่วไป */}
             <div className="card">
               <div className="p-6 border-b border-gray-200">
-                <h2 className="font-bold text-lg text-gray-900">การตั้งค่าทั่วไป</h2>
+                <h2 className="font-bold text-lg text-gray-900">
+                  การตั้งค่าทั่วไป
+                </h2>
               </div>
               <div className="p-6 space-y-6">
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">ชื่อแอปพลิเคชัน</h3>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    ชื่อแอปพลิเคชัน
+                  </h3>
                   <input
                     type="text"
                     className="input-field w-full max-w-md"
@@ -252,11 +357,17 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">ฐานข้อมูล</h3>
-                  <p className="text-sm text-gray-600">MariaDB (ผ่าน Prisma ORM)</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    ฐานข้อมูล
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    MariaDB (ผ่าน Prisma ORM)
+                  </p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">ช่องทาง LINE OA</h3>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    ช่องทาง LINE OA
+                  </h3>
                   <p className="text-sm text-gray-600">
                     ตั้งค่าได้ที่เมนู LINE OA
                   </p>

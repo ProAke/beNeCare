@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type Step =
@@ -12,7 +12,9 @@ type Step =
   | "line-oa"
   | "complete";
 
-const STEPS: Step[] = [
+type Action = "install" | "reinstall";
+
+const INSTALL_STEPS: Step[] = [
   "welcome",
   "environment",
   "database",
@@ -22,11 +24,20 @@ const STEPS: Step[] = [
   "complete",
 ];
 
+const REINSTALL_STEPS: Step[] = [
+  "welcome",
+  "database",
+  "admin",
+  "company",
+  "complete",
+];
+
 export default function InstallerPage() {
+  const [action, setAction] = useState<Action>("install");
   const [step, setStep] = useState<Step>("welcome");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   // Form states
   const [dbHost, setDbHost] = useState("localhost");
@@ -47,16 +58,34 @@ export default function InstallerPage() {
   const [lineChannelId, setLineChannelId] = useState("");
   const [lineChannelSecret, setLineChannelSecret] = useState("");
 
-  const currentStepIndex = STEPS.indexOf(step);
-  const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
+  const [confirmReinstall, setConfirmReinstall] = useState(false);
+
+  // ตรวจสอบ query param action เมื่อโหลดหน้า
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const actionParam = params.get("action");
+      if (actionParam === "reinstall") {
+        setAction("reinstall");
+        setStep("welcome");
+      } else {
+        setAction("install");
+        setStep("welcome");
+      }
+    }
+  }, []);
+
+  const steps = action === "reinstall" ? REINSTALL_STEPS : INSTALL_STEPS;
+  const currentStepIndex = steps.indexOf(step);
+  const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
   const nextStep = () => {
-    const next = STEPS[currentStepIndex + 1];
+    const next = steps[currentStepIndex + 1];
     if (next) setStep(next);
   };
 
   const prevStep = () => {
-    const prev = STEPS[currentStepIndex - 1];
+    const prev = steps[currentStepIndex - 1];
     if (prev) setStep(prev);
   };
 
@@ -90,7 +119,13 @@ export default function InstallerPage() {
       const res = await fetch("/api/installer/test-db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: dbHost, port: dbPort, name: dbName, user: dbUser, password: dbPass }),
+        body: JSON.stringify({
+          host: dbHost,
+          port: dbPort,
+          name: dbName,
+          user: dbUser,
+          password: dbPass,
+        }),
       });
       const data = await res.json();
 
@@ -116,7 +151,13 @@ export default function InstallerPage() {
       const res1 = await fetch("/api/installer/install-db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: dbHost, port: dbPort, name: dbName, user: dbUser, password: dbPass }),
+        body: JSON.stringify({
+          host: dbHost,
+          port: dbPort,
+          name: dbName,
+          user: dbUser,
+          password: dbPass,
+        }),
       });
       const data1 = await res1.json();
       if (!data1.ok) {
@@ -129,7 +170,11 @@ export default function InstallerPage() {
       const res2 = await fetch("/api/installer/create-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: adminEmail, password: adminPassword, fullName: adminName }),
+        body: JSON.stringify({
+          email: adminEmail,
+          password: adminPassword,
+          fullName: adminName,
+        }),
       });
       const data2 = await res2.json();
       if (!data2.ok) {
@@ -177,23 +222,86 @@ export default function InstallerPage() {
     }
   };
 
+  const reinstall = async () => {
+    if (!confirmReinstall) {
+      setError("กรุณาเลือกยืนยันการติดตั้งใหม่ (ยินยอมให้เขียนทับข้อมูลเดิม)");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/installer/reinstall", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirm: true,
+          adminEmail,
+          adminPassword,
+          adminName,
+          companyName,
+          companyTaxId,
+          companyEmail,
+          companyPhone,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        setStep("complete");
+      } else {
+        setError(data.message || "ติดตั้งระบบใหม่ไม่สำเร็จ");
+      }
+    } catch {
+      setError("เกิดข้อผิดพลาดขณะติดตั้งระบบใหม่");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isReinstall = action === "reinstall";
+  const currentStepLabel = step === "complete" ? "เสร็จสิ้น" : `ขั้นตอนที่ ${currentStepIndex + 1}`;
+
   const renderStep = () => {
     switch (step) {
       case "welcome":
         return (
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              ยินดีต้อนรับสู่ beNeCare
+              beNeCare Installer
             </h2>
-            <p className="text-gray-600 mb-6">
-              วิซาร์ดติดตั้งระบบครั้งแรกจะช่วยคุณตั้งค่าฐานข้อมูล สร้างบัญชี
-              ผู้ดูแลระบบ และตั้งค่าบริษัทแรก
-            </p>
+            {isReinstall ? (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
+                  <h3 className="font-bold text-amber-900 mb-2">
+                    ⚠ การติดตั้งระบบใหม่ (Reinstall)
+                  </h3>
+                  <p className="text-sm text-amber-800 mb-4">
+                    การติดตั้งใหม่จะลบข้อมูลเดิมทั้งหมดในฐานข้อมูลและเริ่มต้นใหม่
+                    ตรวจสอบให้แน่ใจว่าคุณได้สำรองข้อมูลสำคัญแล้ว
+                  </p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={confirmReinstall}
+                      onChange={(e) => setConfirmReinstall(e.target.checked)}
+                      className="rounded text-red-600 focus:ring-red-500"
+                    />
+                    <span className="text-sm text-amber-800">
+                      ฉันยืนยันว่าต้องการติดตั้งระบบใหม่ และยินยอมให้ข้อมูลเดิมถูกลบทิ้ง
+                    </span>
+                  </label>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-600 mb-6">
+                วิซาร์ดติดตั้งระบบจะช่วยคุณตั้งค่าฐานข้อมูล สร้างบัญชีผู้ดูแล
+                ระบบ และตั้งค่าบริษัทแรก
+              </p>
+            )}
             <div className="space-y-3 text-left w-full max-w-md mx-auto">
-              <div className="flex items-center gap-3 text-sm text-gray-700">
-                <span className="text-green-600">✓</span>
-                ตรวจสอบสภาพแวดล้อมของเซิร์ฟเวอร์
-              </div>
               <div className="flex items-center gap-3 text-sm text-gray-700">
                 <span className="text-green-600">✓</span>
                 ตั้งค่าการเชื่อมต่อ MariaDB
@@ -204,12 +312,26 @@ export default function InstallerPage() {
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-700">
                 <span className="text-green-600">✓</span>
-                ตั้งค่าบริษัทแรกและ LINE OA
+                ตั้งค่าบริษัทแรก
               </div>
+              {!isReinstall && (
+                <>
+                  <div className="flex items-center gap-3 text-sm text-gray-700">
+                    <span className="text-green-600">✓</span>
+                    ตั้งค่า LINE Official Account
+                  </div>
+                </>
+              )}
             </div>
-            <button onClick={nextStep} className="btn-primary mt-8">
-              เริ่มต้นติดตั้ง
-            </button>
+            <div className="mt-8">
+              <button
+                onClick={nextStep}
+                disabled={isReinstall ? !confirmReinstall : false}
+                className="btn-primary"
+              >
+                {isReinstall ? "เริ่มต้นติดตั้งใหม่" : "เริ่มต้นติดตั้ง"}
+              </button>
+            </div>
           </div>
         );
 
@@ -222,11 +344,17 @@ export default function InstallerPage() {
             <p className="text-gray-600 mb-6">
               ระบบกำลังตรวจสอบว่าเซิร์ฟเวอร์พร้อมติดตั้งหรือไม่
             </p>
-            <button onClick={checkEnvironment} disabled={loading} className="btn-primary">
+            <button
+              onClick={checkEnvironment}
+              disabled={loading}
+              className="btn-primary"
+            >
               {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบสภาพแวดล้อม"}
             </button>
             {error && (
-              <div className="mt-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</div>
+              <div className="mt-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                {error}
+              </div>
             )}
           </div>
         );
@@ -234,7 +362,9 @@ export default function InstallerPage() {
       case "database":
         return (
           <div className="max-w-md mx-auto space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">ตั้งค่าฐานข้อมูล MariaDB</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              ตั้งค่าฐานข้อมูล MariaDB
+            </h2>
             <p className="text-sm text-gray-500">
               กรอกข้อมูลการเชื่อมต่อฐานข้อมูลที่จะใช้กับ beNeCare
             </p>
@@ -306,12 +436,18 @@ export default function InstallerPage() {
               <button onClick={prevStep} className="btn-secondary flex-1">
                 ย้อนกลับ
               </button>
-              <button onClick={testDatabase} disabled={loading} className="btn-primary flex-1">
+              <button
+                onClick={testDatabase}
+                disabled={loading}
+                className="btn-primary flex-1"
+              >
                 {loading ? "กำลังทดสอบ..." : "ทดสอบการเชื่อมต่อ"}
               </button>
             </div>
             {error && (
-              <div className="mt-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</div>
+              <div className="mt-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                {error}
+              </div>
             )}
           </div>
         );
@@ -319,10 +455,13 @@ export default function InstallerPage() {
       case "admin":
         return (
           <div className="max-w-md mx-auto space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">สร้างบัญชี Super Admin</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              {isReinstall ? "สร้างบัญชี Super Admin ใหม่" : "สร้างบัญชี Super Admin"}
+            </h2>
             <p className="text-sm text-gray-500">
-              สร้างบัญชีผู้ดูแลระบบกลางคนแรก ซึ่งจะจัดการบริษัททั้งหมดและ
-              การตั้งค่าระบบ
+              {isReinstall
+                ? "สร้างบัญชีผู้ดูแลระบบกลางคนใหม่ ซึ่งจะจัดการบริษัททั้งหมดและการตั้งค่าระบบ"
+                : "สร้างบัญชีผู้ดูแลระบบกลางคนแรก ซึ่งจะจัดการบริษัททั้งหมดและการตั้งค่าระบบ"}
             </p>
 
             <div className="space-y-3">
@@ -371,8 +510,18 @@ export default function InstallerPage() {
               <button onClick={prevStep} className="btn-secondary flex-1">
                 ย้อนกลับ
               </button>
-              <button onClick={nextStep} disabled={loading} className="btn-primary flex-1">
-                ถัดไป
+              <button
+                onClick={isReinstall ? reinstall : nextStep}
+                disabled={loading}
+                className="btn-primary flex-1"
+              >
+                {isReinstall
+                  ? loading
+                    ? "กำลังติดตั้งใหม่..."
+                    : "ติดตั้งระบบใหม่"
+                  : loading
+                    ? "กำลังสร้างบัญชี..."
+                    : "ถัดไป"}
               </button>
             </div>
           </div>
@@ -381,7 +530,9 @@ export default function InstallerPage() {
       case "company":
         return (
           <div className="max-w-md mx-auto space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">ตั้งค่าบริษัทแรก</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              ตั้งค่าบริษัทแรก
+            </h2>
             <p className="text-sm text-gray-500">
               กรอกข้อมูลบริษัทลูกค้าแรกที่จะใช้งาน beNeCare
             </p>
@@ -443,8 +594,18 @@ export default function InstallerPage() {
               <button onClick={prevStep} className="btn-secondary flex-1">
                 ย้อนกลับ
               </button>
-              <button onClick={nextStep} disabled={loading} className="btn-primary flex-1">
-                ตั้งค่า LINE OA
+              <button
+                onClick={isReinstall ? reinstall : nextStep}
+                disabled={loading}
+                className="btn-primary flex-1"
+              >
+                {isReinstall
+                  ? loading
+                    ? "กำลังติดตั้งใหม่..."
+                    : "ติดตั้งระบบใหม่"
+                  : loading
+                    ? "กำลังสร้างบริษัท..."
+                    : "ตั้งค่า LINE OA"}
               </button>
             </div>
           </div>
@@ -453,7 +614,9 @@ export default function InstallerPage() {
       case "line-oa":
         return (
           <div className="max-w-md mx-auto space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">ตั้งค่า LINE Official Account</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              ตั้งค่า LINE Official Account
+            </h2>
             <p className="text-sm text-gray-500">
               กรอกข้อมูล LINE OA Channel (สามารถข้ามและตั้งค่าทีหลังในเมนู
               การตั้งค่าได้)
@@ -497,7 +660,11 @@ export default function InstallerPage() {
               <button onClick={prevStep} className="btn-secondary flex-1">
                 ย้อนกลับ
               </button>
-              <button onClick={install} disabled={loading} className="btn-primary flex-1">
+              <button
+                onClick={install}
+                disabled={loading}
+                className="btn-primary flex-1"
+              >
                 {loading ? "กำลังติดตั้ง..." : "ติดตั้งและเสร็จสิ้น"}
               </button>
             </div>
@@ -511,7 +678,9 @@ export default function InstallerPage() {
               <span className="text-green-600 text-2xl">✓</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              ติดตั้งระบบสำเร็จ
+              {isReinstall
+                ? "ติดตั้งระบบใหม่สำเร็จ"
+                : "ติดตั้งระบบสำเร็จ"}
             </h2>
             <p className="text-gray-600 mb-8">
               beNeCare พร้อมใช้งานแล้ว คุณสามารถเข้าสู่ระบบด้วยบัญชี Super Admin
@@ -535,9 +704,14 @@ export default function InstallerPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-gray-900">
               beNeCare Installer
+              {isReinstall && (
+                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded ml-2">
+                  Reinstall
+                </span>
+              )}
             </h2>
             <div className="flex gap-2">
-              {STEPS.map((s, i) => (
+              {steps.map((s, i) => (
                 <div
                   key={s}
                   className={`w-2 h-2 rounded-full transition-colors ${
@@ -551,7 +725,7 @@ export default function InstallerPage() {
           </div>
           <div className="w-full">
             <div className="text-sm text-gray-500 mb-4">
-              ขั้นตอนที่ {currentStepIndex + 1} จาก {STEPS.length}
+              {currentStepLabel} จาก {steps.length}
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
               <div
