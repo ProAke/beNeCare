@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type InstallStatus = {
+  installed: boolean;
+  reason: "ok" | "no_env" | "no_db" | "db_connection_error" | "error";
+  message: string;
+  appVersion: string;
+};
+
 export default function HomePage() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,12 +27,20 @@ export default function HomePage() {
           return;
         }
 
-        const data = await res.json();
+        const data: InstallStatus = await res.json();
 
+        // Redirect อัตโนมัติตามสถานะระบบ
         if (data.installed) {
+          // ติดตั้งแล้ว → ไปหน้าเข้าสู่ระบบ
           window.location.href = "/login";
         } else {
-          window.location.href = "/installer";
+          // ยังไม่ได้ติดตั้ง หรือมีข้อผิดพลาด → ไปหน้า Installer
+          // กำหนด action ตามสาเหตุ
+          let action = "install";
+          if (data.reason === "no_db" || data.reason === "db_connection_error") {
+            action = "reinstall";
+          }
+          window.location.href = `/installer?action=${action}`;
         }
       } catch (err) {
         setError(
@@ -68,7 +83,7 @@ export default function HomePage() {
             </button>
           </div>
           <div className="mt-4">
-            <Link href="/installer" className="text-sm text-red-600 hover:underline">
+            <Link href="/installer?action=install" className="text-sm text-red-600 hover:underline">
               → ไปยังหน้าติดตั้งระบบ
             </Link>
           </div>
@@ -82,7 +97,7 @@ export default function HomePage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-red-200 border-t-red-600"></div>
-          <p className="mt-4 text-gray-600">กำลังเตรียมระบบ...</p>
+          <p className="mt-4 text-gray-600">กำลังตรวจสอบสถานะระบบ...</p>
         </div>
       </div>
     );

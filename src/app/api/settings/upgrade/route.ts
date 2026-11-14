@@ -13,7 +13,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // ตรวจสอบ Prisma migrations ที่ยังไม่ได้รัน
+    // อ่านเวอร์ชันปัจจุบันจากระบบ (สำหรับบันทึกใน audit log)
+    let currentVersion = "1.0.0";
+    try {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: "app_version" },
+      });
+      if (setting) {
+        currentVersion = setting.value;
+      }
+    } catch {
+      // ใช้ค่าเริ่มต้นถ้ายังไม่มีตาราง system_settings
+    }
+
+    // รันマイกราชันฐานข้อมูล
     try {
       execSync("npx prisma migrate deploy", {
         cwd: process.cwd(),
@@ -30,20 +43,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // บันทึกประวัติการอัปเกรด
-    await prisma.auditLog.create({
-      data: {
-        action: "system_upgrade",
-        entityType: "system",
-        entityId: null,
-        oldValue: process.env.APP_VERSION || "1.0.0",
-        newValue: targetVersion,
-        userType: "system_admin",
-      },
-    });
-
-    // อัปเดตเวอร์ชันในระบบตัวแปรสภาพแวดล้อม (ใน production ควรเขียนไฟล์ .env)
-    // ที่นี่ใช้การบันทึกในฐานข้อมูลแทน
+    // อัปเดตเวอร์ชันในฐานข้อมูล
     await prisma.systemSetting.upsert({
       where: { key: "app_version" },
       update: { value: targetVersion },
@@ -51,6 +51,18 @@ export async function POST(req: Request) {
         key: "app_version",
         value: targetVersion,
         description: "เวอร์ชันของระบบ beNeCare",
+      },
+    });
+
+    // บันทึกประวัติการอัปเกรดใน audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "system_upgrade",
+        entityType: "system",
+        entityId: null,
+        oldValue: currentVersion,
+        newValue: targetVersion,
+        userType: "system_admin",
       },
     });
 
