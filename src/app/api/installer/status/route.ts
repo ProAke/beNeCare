@@ -12,8 +12,12 @@ export async function GET() {
       return NextResponse.json({
         installed: false,
         reason: "no_env",
+        status: "not_installed",
         message: "ยังไม่ได้กำหนดค่า .env (DATABASE_URL)",
         appVersion: APP_VERSION,
+        canInstall: true,
+        canReinstall: false,
+        canUpdate: false,
       });
     }
 
@@ -34,33 +38,52 @@ export async function GET() {
         // ถ้ายังไม่มีตาราง system_settings ใช้ค่าเริ่มต้น
       }
 
+      const needsUpdate = dbVersion !== APP_VERSION;
+
       return NextResponse.json({
         installed: true,
         reason: "ok",
-        message: "ระบบติดตั้งแล้วและพร้อมใช้งาน",
+        status: needsUpdate ? "needs_update" : "installed",
+        message: needsUpdate
+          ? `พบเวอร์ชันใหม่ (ปัจจุบัน ${dbVersion} → ใหม่ ${APP_VERSION})`
+          : "ระบบติดตั้งแล้วและพร้อมใช้งาน",
         appVersion: dbVersion,
+        latestVersion: APP_VERSION,
+        needsUpdate,
+        canInstall: false,
+        canReinstall: true,
+        canUpdate: needsUpdate,
       });
     } catch (dbError) {
       // มี env แต่ตารางยังไม่สร้าง หรือเชื่อมต่อ DB ไม่ได้
-      const isConnectionError = (dbError as any)?.code === "ECONNREFUSED"
-        || (dbError as any)?.message?.includes("connect")
-        || (dbError as any)?.message?.includes("access");
+      const isConnectionError =
+        (dbError as any)?.code === "ECONNREFUSED" ||
+        (dbError as any)?.message?.includes("connect") ||
+        (dbError as any)?.message?.includes("access");
 
       return NextResponse.json({
         installed: false,
         reason: isConnectionError ? "db_connection_error" : "no_db",
+        status: "installation_needed",
         message: isConnectionError
           ? "เชื่อมต่อฐานข้อมูล MariaDB ไม่สำเร็จ กรุณาตรวจสอบ DATABASE_URL"
           : "มีการตั้งค่า .env แล้ว แต่ยังไม่ได้สร้างตารางฐานข้อมูล",
         appVersion: APP_VERSION,
+        canInstall: true,
+        canReinstall: false,
+        canUpdate: false,
       });
     }
   } catch {
     return NextResponse.json({
       installed: false,
       reason: "error",
+      status: "error",
       message: "เกิดข้อผิดพลาดในการตรวจสอบสถานะระบบ",
       appVersion: APP_VERSION,
+      canInstall: false,
+      canReinstall: false,
+      canUpdate: false,
     });
   }
 }

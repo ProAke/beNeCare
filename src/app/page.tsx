@@ -5,9 +5,15 @@ import Link from "next/link";
 
 type InstallStatus = {
   installed: boolean;
-  reason: "ok" | "no_env" | "no_db" | "db_connection_error" | "error";
+  reason: string;
+  status: "not_installed" | "installed" | "needs_update" | "installation_needed" | "error";
   message: string;
   appVersion: string;
+  latestVersion?: string;
+  needsUpdate?: boolean;
+  canInstall?: boolean;
+  canReinstall?: boolean;
+  canUpdate?: boolean;
 };
 
 export default function HomePage() {
@@ -34,13 +40,8 @@ export default function HomePage() {
           // ติดตั้งแล้ว → ไปหน้าเข้าสู่ระบบ
           window.location.href = "/login";
         } else {
-          // ยังไม่ได้ติดตั้ง หรือมีข้อผิดพลาด → ไปหน้า Installer
-          // กำหนด action ตามสาเหตุ
-          let action = "install";
-          if (data.reason === "no_db" || data.reason === "db_connection_error") {
-            action = "reinstall";
-          }
-          window.location.href = `/installer?action=${action}`;
+          // ยังไม่ได้ติดตั้ง หรือมีข้อผิดพลาด → ไปหน้ากรอก PIN ก่อนเข้าติดตั้ง
+          window.location.href = "/installer/pin";
         }
       } catch (err) {
         setError(
@@ -83,8 +84,8 @@ export default function HomePage() {
             </button>
           </div>
           <div className="mt-4">
-            <Link href="/installer?action=install" className="text-sm text-red-600 hover:underline">
-              → ไปยังหน้าติดตั้งระบบ
+            <Link href="/installer/pin" className="text-sm text-red-600 hover:underline">
+              → ไปยังหน้าติดตั้งระบบ (ต้องการรหัส PIN)
             </Link>
           </div>
         </div>
