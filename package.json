@@ -1,34 +1,32 @@
 {
-  "name": "benecare-app",
-  "version": "0.1.0",
+  "name": "benecare",
+  "version": "1.0.0",
   "private": true,
+  "description": "beNeCare — Group Insurance Customer Care Platform (LINE OA) on Nuxt.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "start": "node .output/server/index.mjs",
+    "generate": "nuxt generate",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@prisma/client": "^7.10.1",
-    "bcryptjs": "^3.0.3",
-    "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^1.71.0",
-    "mysql2": "^3.24.6",
-    "next": "16.4.6",
-    "prisma": "^8.0.0-rc.33",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "@headlessui/vue": "^1.7.23",
+    "@heroicons/vue": "^2.2.0",
+    "@nuxtjs/tailwindcss": "^6.12.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.0",
+    "nuxt": "^3.14.0",
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.5"
   },
   "devDependencies": {
-    "@tailwindcss/turbopack": "4.3.3",
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.6",
-    "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.16.0",
+    "eslint": "^9.10.0",
+    "eslint-config-nuxt": "^0.1.0",
+    "typescript": "^5.6.0"
   }
 }

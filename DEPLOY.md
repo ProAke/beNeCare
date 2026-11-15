@@ -1,96 +1,58 @@
-# คู่มือติดตั้ง beNeCare บน uarea.in (Shared Hosting)
+# คู่มือติดตั้ง beNeCare บน uarea.in (Nuxt.js 3 + MariaDB)
 
-ระบบ beNeCare พัฒนาด้วย Next.js 16 + TypeScript + Tailwind CSS + MariaDB (Prisma ORM)
+ระบบ beNeCare พัฒนาด้วย Nuxt.js 3 + TypeScript + Tailwind CSS + MariaDB
+ตั้งค่าทุกอย่างผ่านหน้าเว็บ UI **ไม่จำเป็นต้องมีไฟล์ `.env`**
 
 ## ขั้นตอนที่ 1 — อัปโหลดไฟล์ขึ้นเซิร์ฟเวอร์
 
-อัปโหลดทุกไฟล์ในโฟลเดอร์ `beNeCare/` (ยกเว้น `node_modules`, `.next`, `out`, `.env.local`) ไปยังโฟลเดอร์เว็บไซต์ เช่น:
+อัปโหลดทุกไฟล์ในโฟลเดอร์ `beNeCare/` (ยกเว้น `node_modules`, `.output`, `dist`, `data/`) ไปยังโฟลเดอร์เว็บไซต์ เช่น:
 
 ```
 /var/www/vhosts/uarea.in/benecare.uarea.in/
 ```
 
-## ขั้นตอนที่ 2 — สร้างไฟล์ `.env` บนเซิร์ฟเวอร์
+## ขั้นตอนที่ 2 — ติดตั้ง Dependency
 
-สร้างไฟล์ `.env` ในรากโปรเจกต์ (ไม่ต้อง commit ลง git) โดยคัดลอกจาก `.env.example` แล้วแก้ไขค่าให้ตรงกับเซิร์ฟเวอร์:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-ตัวอย่างค่าที่ตั้งสำหรับ `bebecare.uarea.in`:
-
-```env
-# โดเมนเว็บไซต์
-NEXTAUTH_URL="https://bebecare.uarea.in"
-APP_URL="https://bebecare.uarea.in"
-
-# ฐานข้อมูล MariaDB (ปรับ host ตามที่ตั้งจริงบน uarea.in)
-# ถ้าฐานข้อมูลอยู่บนเซิร์ฟเวอร์เดียวกัน ใช้ localhost
-# ถ้าใช้ฐานข้อมูลภายนอก ใช้ IP หรือ domain ของ database server
-DATABASE_URL="mysql://เบอร์ผู้ใช้_db:รหัสผ่าน_db@localhost:3306/ชื่อฐานข้อมูล"
-
-# รหัสลับสำหรับ session (สร้างค่าสุ่มใหม่ เช่น openssl rand -base64 32)
-NEXTAUTH_SECRET="เปลี่ยนเป็นสร็อตสุ่มยาวๆ"
-
-# LINE Official Account (จาก LINE Developers Console)
-LINE_CHANNEL_ID="ลำดับช่องทาง LINE ของคุณ"
-LINE_CHANNEL_SECRET="รหัสลับช่องทาง LINE ของคุณ"
-LINE_CHANNEL_ACCESS_TOKEN="โทเค็นเข้าถึงช่องทาง LINE ของคุณ"
-
-# AI (ตัวเลือก — สำหรับตอบคำถามอัตโนมัติ)
-OPENAI_API_KEY="คีย์ API ของคุณ"
-OPENAI_MODEL="gpt-4o-mini"
-
-# เวอร์ชันระบบ
-APP_NAME="beNeCare"
-APP_VERSION="1.0.0"
-```
-
-## ขั้นตอนที่ 3 — ติดตั้ง Dependency และสร้าง Prisma Client
+บนเซิร์ฟเวอร์ ให้รันคำสั่ง:
 
 ```bash
+cd /var/www/vhosts/uarea.in/benecare.uarea.in
 npm install --production
-npx prisma generate
 ```
 
-## ขั้นตอนที่ 4 — สร้างฐานข้อมูลและรันマイกราชัน
-
-```bash
-npx prisma migrate deploy
-```
-
-หรือถ้ายังไม่มีตารางในฐานข้อมูล ให้สร้างด้วย:
-
-```bash
-npx prisma db push --accept-data-loss
-```
-
-## ขั้นตอนที่ 5 — Build และรันระบบ
+## ขั้นตอนที่ 3 — Build ระบบ
 
 ```bash
 npm run build
+```
+
+จะสร้างโฟลเดอร์ `.output/` สำหรับรันใน production
+
+## ขั้นตอนที่ 4 — รันระบบ
+
+```bash
 npm start
 ```
 
 หรือถ้าใช้บน cPanel / Plesk ให้ตั้งค่า Node.js application ผ่าน control panel:
 - เลือกเวอร์ชัน Node.js (แนะนำ 18.x ขึ้นไป)
-- ตั้งไฟล์เริ่มต้นเป็น `server.js` หรือใช้ `npm start`
-- ตั้งค่า environment variables ผ่าน control panel
+- ตั้งไฟล์เริ่มต้นเป็น `node .output/server/index.mjs`
+- ตั้งค่า environment variables ตามจำเป็น (ถ้ามี)
 
-## ขั้นตอนที่ 6 — ติดตั้งระบบครั้งแรก (Installer)
+## ขั้นตอนที่ 5 — ติดตั้งระบบครั้งแรกผ่านหน้าเว็บ
 
 เปิดเว็บไซต์ `https://bebecare.uarea.in` จะเข้าสู่หน้าติดตั้งอัตโนมัติ
 
 ทำตามขั้นตอน:
-1. ตรวจสอบสภาพแวดล้อม
-2. ตั้งค่าการเชื่อมต่อ MariaDB
-3. สร้างบัญชี Super Admin คนแรก
-4. ตั้งค่าบริษัทแรก
-5. ตั้งค่า LINE Official Account (ตัวเลือก)
+1. **กรอกรหัส PIN** (เริ่มต้น: **524452**) — รหัสนี้ใช้สำหรับเข้าถึงหน้าติดตั้งทุกครั้ง
+2. **ตั้งค่าฐานข้อมูล MariaDB** — กรอก host, port, database name, username, password ผ่านหน้า UI
+3. **สร้างบัญชี Super Admin** — อีเมล, รหัสผ่าน, ชื่อผู้ดูแลระบบ
+4. **ตั้งค่าบริษัทแรก** — ชื่อบริษัท, รหัสประจำตัวผู้เสียภาษี, อีเมลผู้ติดต่อ, เบอร์โทร
+5. **ตั้งค่า LINE Official Account** (ตัวเลือก) — Channel ID, Channel Secret (สามารถตั้งค่าทีหลังได้)
 
-## ขั้นตอนที่ 7 — ตั้งค่า LINE Official Account
+หลังติดตั้งเสร็จ ระบบจะสร้างไฟล์ `data/install-config.json` (แทนไฟล์ `.env`)
+
+## ขั้นตอนที่ 6 — ตั้งค่า LINE Official Account
 
 ใน LINE Developers Console ตั้งค่า Webhook URL เป็น:
 
@@ -98,11 +60,21 @@ npm start
 https://bebecare.uarea.in/api/line/webhook
 ```
 
-และตั้ง Redirect URI (ถ้ามี) เป็น:
+## การติดตั้งใหม่ (Reinstall / Reset)
 
-```
-https://bebecare.uarea.in/api/auth/line/callback
-```
+หากการตั้งค่าไม่ครบถ้วนหรือต้องการเริ่มต้นใหม่:
+1. เข้าหน้า `https://bebecare.uarea.in/installer/pin`
+2. กรอกรหัส PIN (524452)
+3. เลือกโหมด "ติดตั้งระบบใหม่ (Reinstall)"
+4. ทำเครื่องหมายยืนยันการลบข้อมูลเดิม
+5. กรอกข้อมูลใหม่แล้วติดตั้ง
+
+## การอัปเดตเวอร์ชัน (Update Version)
+
+หลังจากติดตั้งแล้ว เข้าเมนู "การตั้งค่าระบบ" → "ส่วนอัปเกรดระบบ"
+- ตรวจสอบเวอร์ชันปัจจุบันและเวอร์ชันใหม่
+- คลิก "สำรองข้อมูลก่อนอัปเกรด" (แนะนำ)
+- คลิก "อัปเกรดเป็นเวอร์ชัน X.X.X" — ระบบจะรันマイกราชันอัตโนมัติ
 
 ## การแก้ไขปัญหา Server Error 500
 
@@ -110,11 +82,10 @@ https://bebecare.uarea.in/api/auth/line/callback
 
 | อาการ | วิธีแก้ไข |
 |---|---|
-| หน้าขาว / 500 Error ทันที | ตรวจสอบว่าไฟล์ `.env` มีอยู่และ `DATABASE_URL` ถูกต้อง |
-| ไม่สามารถเชื่อมต่อฐานข้อมูล | ตรวจสอบ host, port, username, password ของ MariaDB |
-| Prisma client error | รัน `npx prisma generate` อีกครั้ง |
-| ตารางฐานข้อมูลไม่พบ | รัน `npx prisma migrate deploy` |
-| Middleware warning | แจ้งเตือนเท่านั้น ไม่ส่งผลต่อการทำงาน (จะแก้ในรอบถัดไป) |
+| หน้าขาว / 500 Error ทันที | ตรวจสอบว่าไฟล์ `data/install-config.json` มีอยู่หรือไม่ (ยังไม่ได้ติดตั้งระบบ) |
+| ไม่สามารถเชื่อมต่อฐานข้อมูล | ตรวจสอบ host, port, username, password ของ MariaDB ในหน้าติดตั้ง |
+| Build error เกี่ยวกับ Tailwind | ตรวจสอบว่าได้รัน `npm install` และ `npm run build` แล้ว |
+| Middleware warning | แจ้งเตือนเท่านั้น ไม่ส่งผลต่อการทำงาน |
 
 ดูรายละเอียดข้อผิดพลาดได้จากไฟล์ log ของเซิร์ฟเวอร์หรือคอนโซลเบราว์เซอร์ (F12 → Network → ดู response ของ request ที่ล้มเหลว)
 
@@ -122,24 +93,37 @@ https://bebecare.uarea.in/api/auth/line/callback
 
 ```
 /var/www/vhosts/uarea.in/benecare.uarea.in/
-├── .env                    ← สร้างใหม่ (ไม่ต้อง commit)
-├── .env.example            ← ตัวแปรตัวอย่าง
+├── .env.example            ← ตัวแปรตัวอย่าง (ไม่บังคับต้องใช้)
 ├── package.json
 ├── package-lock.json
-├── prisma/
-│   └── schema.prisma
-├── src/
-│   ├── app/
-│   │   ├── page.tsx        ← หน้าแรก (redirect ตามสถานะ)
-│   │   ├── error.tsx       ← จัดการข้อผิดพลาด 500
-│   │   └── global-error.tsx
-│   └── lib/prisma.ts
-├── next.config.ts
-└── .next/                  ← สร้างหลังรัน npm run build
+├── nuxt.config.ts
+├── app.vue
+├── assets/css/main.css
+├── composables/
+├── components/
+├── pages/
+│   ├── index.vue
+│   ├── login.vue
+│   ├── dashboard.vue
+│   ├── installer/
+│   │   ├── pin.vue
+│   │   └── index.vue
+│   └── settings/
+│       └── index.vue
+├── server/
+│   └── api/
+├── data/
+│   ├── install-config.json   ← สร้างโดย Installer (แทน .env)
+│   └── backup_config_*.json  ← ไฟล์สำรองการตั้งค่า
+├── .output/                  ← สร้างหลังรัน npm run build
+├── docs/
+├── DEPLOY.md
+└── README.md
 ```
 
 ## หมายเหตุสำคัญ
 
-- **ไม่ควร commit ไฟล์ `.env` ลง git** เนื่องจากมีรหัสผ่านและข้อมูลลับ
+- **ไม่จำเป็นต้องมีไฟล์ `.env`** — การตั้งค่าทั้งหมดทำผ่านหน้า UI และเก็บใน `data/install-config.json`
+- **ไม่ควร commit ไฟล์ `data/install-config.json` ลง git** เนื่องจากมีรหัสผ่านและข้อมูลลับ
 - หากเซิร์ฟเวอร์ไม่รองรับการรัน `npm start` ตลอดเวลา ให้ใช้ process manager เช่น `pm2`
 - การอัปเกรดระบบในอนาคต ให้เข้าเมนู **การตั้งค่าระบบ → ส่วนอัปเกรดระบบ** หลังล็อกอินในฐานะ Super Admin
